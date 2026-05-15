@@ -1,5 +1,2 @@
 streamlit
-transformers
-torch
-sentencepiece
-sacrebleu
+scikit-learn
