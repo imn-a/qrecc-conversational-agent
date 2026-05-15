@@ -4,6 +4,8 @@ from transformers import T5ForConditionalGeneration, T5Tokenizer
 import torch
 
 st.set_page_config(page_title="Conversational Question Rewriter", layout="centered")
+st.title("💬 Conversational Question Rewriter")
+st.markdown("*QReCC Project — Ask questions naturally, the system rewrites ambiguous ones using T5.*")
 
 @st.cache_resource
 def load_model():
@@ -36,26 +38,29 @@ def dialogue_clarity_score(original, rewritten, context):
     enrichment = len(new_words & context_words) / (len(new_words) + 1)
     return round(0.4 * ambiguity_reduction + 0.3 * preservation + 0.3 * enrichment, 4)
 
-st.title("Conversational Question Rewriter")
-st.markdown("**QReCC Project** — Rewrite ambiguous questions using conversation context and T5.")
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "context" not in st.session_state:
+    st.session_state.context = []
 
-st.subheader("Conversation Context")
-context_input = st.text_area("Enter each turn separated by |||", placeholder="Turn 1 ||| Turn 2 ||| Turn 3")
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-st.subheader("Ambiguous Question")
-question_input = st.text_input("Enter the ambiguous question", placeholder="e.g. What are its effects?")
+if prompt := st.chat_input("Ask a question..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-if st.button("Rewrite Question"):
-    if question_input:
-        context = [c.strip() for c in context_input.split("|||") if c.strip()]
+    with st.chat_message("assistant"):
         with st.spinner("Rewriting..."):
-            rewritten = rewrite_question(context, question_input)
-            dcs = dialogue_clarity_score(question_input, rewritten, context)
-        st.success("Done!")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Rewritten Question", rewritten)
-        with col2:
-            st.metric("Dialogue Clarity Score (DCS)", dcs)
-    else:
-        st.warning("Please enter a question.")
+            rewritten = rewrite_question(st.session_state.context, prompt)
+            dcs = dialogue_clarity_score(prompt, rewritten, st.session_state.context)
+            
+            response = f"**Rewritten question:** {rewritten}\n\n**Dialogue Clarity Score (DCS):** {dcs}"
+            st.markdown(response)
+            
+            st.session_state.context.append(prompt)
+            st.session_state.context.append(rewritten)
+    
+    st.session_state.messages.append({"role": "assistant", "content": response})
